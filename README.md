@@ -22,8 +22,14 @@
 # 换输出目录、限制并行度
 .\html2md.ps1 -OutDir "out" -Throttle 4
 
+# 输出到绝对路径（支持任意盘符/目录）
+.\html2md.ps1 -OutDir "D:\docs\md"
+
 # 只转有变化的文件（再次运行很快）
 .\html2md.ps1 -Incremental
+
+# 顺便把运行摘要写入日志文件
+.\html2md.ps1 -Log "convert.log"
 ```
 
 ### 参数速查
@@ -31,10 +37,11 @@
 | 参数 | 默认 | 作用 |
 |------|------|------|
 | `Source`（位置参数） | `.` | 要转换的目录 / 通配符 / 单文件 |
-| `-OutDir` | `md_output` | 输出根目录 |
+| `-OutDir` | `md_output` | 输出根目录（**支持绝对路径**） |
 | `-Throttle` | `0`=自动 | 并行度（0 表示用满 CPU 逻辑核） |
 | `-Incremental` | 关 | 跳过「已存在且源未变」的 md |
 | `-Quiet` | 关 | 不逐条打印成功文件 |
+| `-Log` | 无 | 把本次运行摘要追加写入日志文件 |
 | `-IncludeBuildArtifacts` | 关 | 连 node_modules / build / dist 等也一起转 |
 
 ## 环境要求
@@ -47,7 +54,9 @@
 
 ## 行为说明
 
-- **输出树镜像源目录**：`源路径/xxx/foo.html → md_output/xxx/foo.md`，同名文件不冲突。
+- **输出树镜像源目录**：`源路径/xxx/foo.html → 输出目录/xxx/foo.md`，同名文件不冲突。
+- **`-OutDir` 支持绝对路径**：相对路径拼到当前目录，绝对路径原样使用。
+- **运行日志**：`-Log "xxx.log"` 会追加一行摘要（时间戳、源、找到/待转/跳过/成功/失败数、耗时、输出目录），供事后追溯。
 - **默认跳过**构建与缓存目录：`node_modules`、`build`、`dist`、`.pubcache`、`_probe`、`.dsh-diag`、`.git`、`.venv`。需要一起转加 `-IncludeBuildArtifacts`。
 - **不修改任何源文件**，转换结果只写进输出目录。
 - 转换失败时脚本返回退出码 1，便于脚本化调用。

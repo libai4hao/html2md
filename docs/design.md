@@ -21,6 +21,8 @@
 | 输出结构 | 相对路径镜像源树 | 同名文件（多个 `index.html`）不互相覆盖 |
 | 性能 | `ForEach-Object -Parallel` | 并行转换，默认用满 CPU 逻辑核 |
 | 增量 | `-Incremental` 按 mtime 跳过 | 大批量重复运行提速 |
+| 输出目录 | `-OutDir` 相对拼 cwd、绝对原样用 | 支持任意目标位置 |
+| 日志 | `-Log` 追加一行运行摘要 | 含时间戳/耗时/成败统计，事后可追溯 |
 | 范围控制 | 黑名单 + `-IncludeBuildArtifacts` | 避免转换大量无意义内容 |
 | 输入形式 | 目录 / 单文件 / 通配符 | 满足「指定所有 html」的灵活需求 |
 
@@ -32,6 +34,8 @@
   - 源在 cwd 之外 → 相对其父目录，保留源目录自身名字，避免不同源目录同名文件冲突。
 - **并行**：`ForEach-Object -Parallel -ThrottleLimit`，每个线程内 `& pandocPath -f html -t gfm -o $_.Out $_.Src`，用 `$using:` 传 pandoc 路径与开关。
 - **增量**：`(目标 md 的 LastWriteTime) >= (源 html 的 LastWriteTime)` 视为已最新，跳过。
+- **输出目录**：`[System.IO.Path]::IsPathRooted($OutDir)` 判断，绝对路径直接用，相对路径 `Join-Path $cwd $OutDir`。
+- **日志**：`-Log` 时用 `Add-Content -Encoding utf8` 追加一行摘要（时间戳、源、找到/待转/跳过/成功/失败数、耗时、输出目录）。
 - **退出码**：有失败则 `exit 1`，便于脚本化。
 
 ## 5. 验证
@@ -39,6 +43,8 @@
 - 绝对路径目录源（cwd 外）：成功 32、失败 0，输出树 `md_output\doc\*.md` 正确镜像。
 - 增量复跑：`待转换 0，跳过 32`，秒级返回。
 - 通配符源（`TradeSpar\*.html`）：成功 1，输出 `md_output\index.md`。
+- 绝对路径 `-OutDir`：输出正确落在指定盘符目录，无 `Join-Path` 拼错。
+- `-Log`：追加一行含时间戳/耗时/成败统计的摘要日志。
 - 32 个 FFmpeg 文档并行转换（16 核）约 14–15 秒，此前串行约 3 倍以上耗时。
 
 ## 6. 已知限制与后续

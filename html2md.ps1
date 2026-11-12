@@ -20,6 +20,10 @@
 .EXAMPLE
     .\html2md.ps1 -Incremental
     跳过已存在且源未变化的 md（再次运行提速）
+
+.EXAMPLE
+    .\html2md.ps1 -OutDir "D:\docs\md" -Log "convert.log"
+    指定绝对输出目录，并把本次运行摘要追加写入日志文件
 #>
 
 [CmdletBinding()]
@@ -40,7 +44,10 @@ param(
     [switch]$IncludeBuildArtifacts,
 
     # 静默：成功文件不逐条打印
-    [switch]$Quiet
+    [switch]$Quiet,
+
+    # 可选：把本次运行摘要追加写入日志文件（含时间戳/耗时/成败统计）
+    [string]$Log
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,7 +95,8 @@ if ($files.Count -eq 0) {
 }
 
 # ── 3. 计算目标路径（输出树镜像源树）────────────────────────────
-$outRoot = Join-Path $cwd $OutDir
+# OutDir：绝对路径直接用；相对路径拼到 cwd
+$outRoot = if ([System.IO.Path]::IsPathRooted($OutDir)) { $OutDir } else { Join-Path $cwd $OutDir }
 $jobs = foreach ($f in $files) {
     $rel = $f.FullName.Substring($base.Length).TrimStart('\', '/')
     [pscustomobject]@{
@@ -125,7 +133,7 @@ Write-Host "`n══════════════════════
 Write-Host "  html2md  ·  找到 $($files.Count) 个 html" -ForegroundColor Cyan
 if ($Incremental) { Write-Host "  待转换 $($todo.Count) 个，跳过 $($skipped.Count) 个（已是最新）" -ForegroundColor Cyan }
 else { Write-Host "  待转换 $($todo.Count) 个" -ForegroundColor Cyan }
-Write-Host "  并行度 $throttle  ·  输出 → $OutDir\" -ForegroundColor Cyan
+Write-Host "  并行度 $throttle  ·  输出 → $outRoot\" -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════════════`n" -ForegroundColor Cyan
 
 if ($todo.Count -eq 0) {
@@ -148,12 +156,21 @@ $results = $todo | ForEach-Object -Parallel {
 $ok   = @($results | Where-Object Ok).Count
 $fail = @($results | Where-Object { -not $_.Ok }).Count
 $sw.Stop()
+$elapsed = $sw.Elapsed
+
+# 可选：追加运行日志
+if ($Log) {
+    $logPath = if ([System.IO.Path]::IsPathRooted($Log)) { $Log } else { Join-Path $cwd $Log }
+    $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $line = "[$stamp] Source=$Source 找到=$($files.Count) 待转换=$($todo.Count) 跳过=$($skipped.Count) 成功=$ok 失败=$fail 耗时=$($elapsed.TotalSeconds.ToString('0.00'))s 输出=$outRoot"
+    Add-Content -Path $logPath -Value $line -Encoding utf8
+}
 
 # ── 5. 汇总 ────────────────────────────────────────────────────
 Write-Host "`n─────────────────────────────────────────────────────" -ForegroundColor Cyan
 Write-Host "  完成：✔ 成功 $ok   ✖ 失败 $fail" -ForegroundColor Cyan
 if ($skipped.Count) { Write-Host "  跳过（已最新）：$($skipped.Count)" -ForegroundColor DarkGray }
-Write-Host "  耗时 $($sw.Elapsed.TotalSeconds.ToString('0.00')) 秒 · 输出目录 $OutDir\" -ForegroundColor Cyan
+Write-Host "  耗时 $($elapsed.TotalSeconds.ToString('0.00')) 秒 · 输出目录 $outRoot\" -ForegroundColor Cyan
 Write-Host "─────────────────────────────────────────────────────`n" -ForegroundColor Cyan
 
 if ($fail -gt 0) { exit 1 }
