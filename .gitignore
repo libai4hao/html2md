@@ -1,0 +1,10 @@
+# 构建产物
+md_output/
+out/
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.tmp
+.idea/
+.vscode/
